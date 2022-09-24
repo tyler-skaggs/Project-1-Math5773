@@ -2,7 +2,7 @@
 #'
 #' @param DataTable A 1-way frequency table as produced by \code{xtabs()}.
 #' @param alpha A real number between 0 and 1.
-#' @importFrom graphics par
+#' @importFrom graphics par points
 #' @importFrom stats chisq.test
 #'
 #' @description
@@ -72,15 +72,17 @@ twoWay <- function(DataTable, alpha = 0.05){
 
   axis(1,at = mid,labels = Label)
   abline(v = mean(mid))
+  points(mid,Chi_out$expected/n, pch = 4, lwd = 3)
   arrows(mid, Lower, mid, Upper, length = 0.1, code = 3, angle = 90,
          col = "firebrick1", lwd = 2)
 
   #named list
   my_list <- list(Props = DataTable/n, Counts = Chi_out$observed,
+                  data = addmargins(DataTable, margin = c(1,2)),
                   Expected = Chi_out$expected, RowProps = p, CI = CIs,
-                  pval <- Chi_out$p.value)
+                  pval = Chi_out$p.value)
 
-
+  print(addmargins(DataTable, margin = c(1,2)))
   cat("Row Props: \n", p, "\n")
   print(Chi_out)
   return(invisible(my_list))

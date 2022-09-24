@@ -47,13 +47,12 @@ fisherExactTest <- function(DataTab, alpha = 0.05){
 
   #For loops to get label names and row props
   Label <- c() #Label names for plot
-  for(i in 1:num_row){
-    for(j in 1:num_col){
+  for(j in 1:num_col){
+    for(i in 1:num_row){
       p <- c(p, DataTab[i,j]/n_row[i])
     }
   }
   Label <- c(Label, rep(names(p1[,1]),num_col))
-
 
   ################# Plotting #############
   barplot(p, col = c("lightblue", "purple"),

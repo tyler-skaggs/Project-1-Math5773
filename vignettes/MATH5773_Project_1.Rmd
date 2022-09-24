@@ -15,19 +15,301 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
+library(Intro2MLR)
 library(Proj1MATH5773Skag0011)
+library(graphics)
+v <- Intro2MLR::myreadxl("C:/Users/tyler/Documents/Grad School/MATH 5773/Data/Excel/")
 ```
 
-# Notes
-When checking the package I kept getting the following note:
-<center>
+## Description
+An R package that will analyze one-way and two-way tables
 
-❯ checking for future file timestamps ... NOTE   unable to verify current time
+## The `oneWay()` Funciton
+This function will create confidence intervals on the estimates $\hat{p}$ and on the differences of each of the estimates. There are two plots made. The first plot is inspired by `s20x::freq1way` function (though it is my best attempt at recreating in not a copy of thier code). I made an addition of shading each of the bars according to their proportional value, so at a glance it is eaiser to see large differences. The second plot shows the differences in the estimates and their according confidence interval.
+```{r}
+oneWay <- function(DataTab, alpha = 0.05){
+  ################# Calculations #################
 
-</center>
+  out <- chisq.test(DataTab, p = rep(1/length(DataTab), length(DataTab)))
+  #This Functions creates a confidence interval based on Wald's Method
+  #Two tailed confidence interval
+  alph2 <- alpha/2
+  z = qnorm(1-alph2)
 
-I fixed this by adding `_R_CHECK_SYSTEM_CLOCK_=0` into my `.Renviron` file.
+  Data.f = data.frame(DataTab)
+  TabSum = sum(DataTab)
 
+  p = DataTab/TabSum #Vector of probabilities
+  sd = sqrt(p *(1-p)/TabSum) #standard deviation
+
+  #Lower and Upper bound of CI
+  Lower = round(p-z*sd, 4)
+  Upper = round(p+z*sd, 4)
+
+  CIs <- data.frame(cbind(p = round(p, 4), Lower, Upper)) #bind by column
+
+  ################# Calculations for diff #################
+
+  #Two tailed Confidence Interval
+  alph2 <- alpha/2
+  z = qnorm(1-alph2)
+
+  length = length(DataTab)
+  n = sum(DataTab)
+
+  #Vectors that will hold the upper and lower bounds of the confidence intervals
+  Lower2 <- c()
+  Upper2 <- c()
+  Diff <- c()
+  L <- c()
+
+  #Double for Loop to calculate each difference
+  #Not all of these are needed, but this was the easiest way I could think
+  #to do the calculations.
+  for (i in 1:length){
+    for (j in 1:length){
+      #Differences
+      Diff[length*(i-1) + j] <- p[i] - p[j]
+
+      #Calculate Lower Bound
+      Lower2 <- c(Lower2, p[i] - p[j] - z*sqrt(
+        (p[i]*(1-p[i]))/n + (p[j]*(1-p[j]))/n + (2*p[i]*p[j])/n))
+
+      #Calculate Upper Bound
+      Upper2 <- c(Upper2, p[i] - p[j] + z*sqrt(
+        (p[i]*(1-p[i]))/n + (p[j]*(1-p[j]))/n + (2*p[i]*p[j])/n))
+
+      #Labels
+      L <- c(L, paste0("p[", i, "] - p[", j, "]"))
+    }
+  }
+
+  ################# Refine Data ##################
+  #This will refine the data to the top right triangle of a matrix that contians
+  # the difference, lower bound, and upper bound
+  RDif <- c()
+  RLow <- c()
+  RUp  <- c()
+  Labels <- c()
+  shift = 2
+  for(i in 0:(length-2)){
+    for(j in shift:length){
+      RDif <- c(RDif, Diff[length*i + j])
+      RLow <- c(RLow, Lower2[length*i + j])
+      RUp <- c(RUp, Upper2[length*i + j])
+      Labels <- c(Labels, L[length*i + j])
+    }
+    shift = shift + 1
+  }
+
+  ################# Plotting #####################
+
+  par(mfrow = c(2,1), mar = c(4,2,3,2))
+  # `ColPcent` helps make colors more transparent based on `p`.
+  # The code is modified from:
+  # https://www.dataanalytics.org.uk/make-transparent-colors-in-r
+
+  ColPcent <- function(x = 0.5, cols = c('black') ){
+    val <- col2rgb(cols)
+    newcols <- rgb(val[1,],val[2,],val[3,], maxColorValue = 255, alpha = round((255*x)))
+    invisible(newcols)
+  }
+
+  #Mids is the points where to place CIs
+  mids <- barplot(CIs$p ~ Data.f[,1], col = ColPcent(CIs$p),
+                  ylim = c(0, max(Upper)+.05),
+                  main = "Proportions by Catagory \nwith Confidence Interval",
+                  xlab = (colnames(Data.f))[1], ylab = "Porportion")
+
+  #Add line of null p value
+  abline(h = 1/length(DataTab), col = "blue4", lwd = 1.75, lty = 5)
+
+  #plot the confidence intervals on bar plot
+  arrows(mids, Lower, mids, Upper, length = 0.1, code = 3, angle = 90,
+         col = "firebrick1", lwd = 2)
+
+
+  plot(1:length(RDif), RDif, xaxt = 'n' ,col = "black", pch = 0, lwd = 3,
+       ylim = c(min(RLow), max(RUp)), xlab = "Difference")
+  axis(1,at = 1:length(RDif),labels = Labels)
+  abline(h = 0, col = "blue4", lwd = 1.75, lty = 5)
+  arrows(1:length(RDif), RLow, 1:length(RDif), RUp, length = 0.1, code = 3, angle = 90,
+         col = "firebrick1", lwd = 2)
+
+  my_list <- list(prob = as.vector(p), Conf = CIs, Diff = RDif, pval = out$p.value)
+
+  print(my_list)
+
+  return(invisible(my_list))
+}
+```
+
+
+## The `twoWay()` Funciton
+This function takes in a 2-way frequency table to test for independence in the data. A named list of information is returned along with a plot is inspired by `s20x::rowdistr` function (though it is my best attempt at recreating in not a copy of their code). At the top of each bar there is a confidence interval of the data and on each bar is the expected count (provided by `chisq.test`) divided by $n$.
+```{r}
+twoWay <- function(DataTable, alpha = 0.05){
+
+  alph2 <- alpha/2
+  z = qnorm(1-alph2)
+
+  n <- sum(DataTable)
+  length <- length(DataTable)
+  length1 <- length(DataTable[1,]) #number of cols
+  length2 <- length(DataTable[,1]) #number of rows
+
+  Chi_out <- chisq.test(DataTable)
+  p1 <- DataTable/n
+
+  p <- c() #row probabilities
+  nr <- c() #total in each row
+
+  #Find total in each row
+  for(i in 1:length1){
+    nr <- c(nr, sum(DataTable[i,]))
+  }
+
+  #For loops to get label names and row props
+  Label <- c() #Label names for plot
+  for(i in 1:length1){
+    for(j in 1:length2){
+      p <- c(p, DataTable[j,i]/nr[j])
+    }
+    Label <- c(Label, names(p1[,1]))
+  }
+
+  #Lower and Upper bound of CI of rows
+  sd = sqrt(p *(1-p)/n) #standard deviation
+  Lower = (p-z*sd)
+  Upper = (p+z*sd)
+
+  #Row confidence interval
+  CIs <- data.frame(cbind(p = round(p, 4), Lower, Upper))
+
+
+  ################# Plotting #####################
+
+  mid <- barplot(p, col = c("lightblue", "purple"),
+                 ylim = c(0, max(p) + 0.05), main = "Row Proportions")
+
+  axis(1,at = mid,labels = Label)
+  abline(v = mean(mid))
+  points(mid,Chi_out$expected/n, pch = 4, lwd = 3)
+  arrows(mid, Lower, mid, Upper, length = 0.1, code = 3, angle = 90,
+         col = "firebrick1", lwd = 2)
+
+  #named list
+  my_list <- list(Props = DataTable/n, Counts = Chi_out$observed,
+                  data = addmargins(DataTable, margin = c(1,2)),
+                  Expected = Chi_out$expected, RowProps = p, CI = CIs,
+                  pval = Chi_out$p.value)
+
+  print(addmargins(DataTable, margin = c(1,2)))
+  cat("Row Props: \n", p, "\n")
+  print(Chi_out)
+  return(invisible(my_list))
+}
+```
+
+
+## The `fisherExactTest()` Funciton
+This function runs Fisher's Exact Test of independence on a $2xC$ 2-way contingency table. This function calls `fisher.test()` to do the blunt of the calculations. A plot, similar to that in `twoWay` is made to provide a view of the data. An updated contingency table with the margin sums is returned a long with the $p$ value from the test.
+```{r}
+fisherExactTest <- function(DataTab, alpha = 0.05){
+  fish_out <- fisher.test(DataTab, alpha)
+
+  #Details of data
+  n <- sum(DataTab)
+  length <- length(DataTab)
+  num_row <- length(DataTab[,1])
+  num_col <- length(DataTab[1,])
+  n_row <- c()
+  n_col <- c()
+  p1 <- DataTab/n
+
+  #Count row totals
+  for(i in 1:num_row){
+    n_row <- c(n_row, sum(DataTab[i,]))
+  }
+
+  for(i in 1:num_col){
+    n_col <- c(n_col, sum(DataTab[,i]))
+  }
+
+  p <- c()
+
+  #For loops to get label names and row props
+  Label <- c() #Label names for plot
+  for(j in 1:num_col){
+    for(i in 1:num_row){
+      p <- c(p, DataTab[i,j]/n_row[i])
+    }
+  }
+  Label <- c(Label, rep(names(p1[,1]),num_col))
+
+  ################# Plotting #############
+  barplot(p, col = c("lightblue", "purple"),
+          ylim = c(0, max(p) + 0.05), main = "Row Proportions")
+  axis(1,at = 1:length,labels = Label)
+
+  p <- matrix(p, num_row, num_col, byrow = TRUE)
+
+  #add sum margin to data
+  withmargin <- addmargins(DataTab, margin = c(1,2))
+  print(withmargin)
+  print(fish_out)
+
+  #return list
+  my_listf <- list(pval = fish_out$p.value, data = withmargin)
+
+    return(invisible(my_listf))
+}
+```
+
+
+## Examples and Output
+
+### `oneWay()`
+```{r, out.width="100%", fig.width=8, fig.height = 6, fig.align='center'}
+S.tab <- xtabs(NUMBER~CATEGORY, data = v$SCAN)
+oneWay(S.tab, 0.05)
+```
+Here we are testing uniformity; $H_0: p_i = \frac{1}{4}$ for all $i,j$. With the first look at the plots, we can see that there are some large jumps in the bars, and many of the confidence intervals dont overlap with the line $y = 0.25$. Looking at the second plot, many of the differences don't contain 0 as a value in their confidence interval. Looking at the $p$ value we get 0.002, which would go with our intuition from the plots that we should reject the null and, with reasonable confidence, conclude that there is a difference in the proportions.
+
+
+### `twoWay()`
+```{r, out.width="100%", fig.width=8, fig.height = 6, fig.align='center'}
+H.tab <- xtabs(Number~., data = v$HYBRID)
+temp<-twoWay(H.tab, 0.05)
+temp
+```
+In this model we want to decide if the data is independent or not; $H_0:$ Data is independent. We first start by looking at our plot of the row distributions. From a view of this plot we see that the confidence intervals associated with each bar is tight and do not provide much intersection with their counterpart in the other factor. In a more general view, the profile of each factor do no look similar to one another. This make us suspicious that the data is dependent on the factors. Further analysis shows the $p$ value is very small. This would agree with our view of the graph. The analysis of this data implies that we should reject the Null and conclude (with reasonalbe confidence) that the data is not independent of its factors.
+
+
+### `fisherExactTest()`
+```{r, out.width="80%", fig.width=8, fig.height = 6, fig.align='center'}
+B.tab <- xtabs(NUMBER~ ADHESIVE + ARIScore , data = v$BONDING)
+chi_out <- chisq.test(B.tab)
+chi_out$p.value
+chi_out$expected
+fisherExactTest(B.tab, 0.05)
+```
+In the case of this data, we want to test for independence. However, after running `chisq.test()` we get a warning about the data and no $p$ value available. Further analysis of the expected counts shows that we do not have a sufficient amount (at least $80\%$) of expected counts at at least 5 or more. This means we need another method to test the data, hence Fisher's Exact test. Running the function we are first greeted with a plot, at a glance we would usually be inclined to assume that the data would be dependent; this is the issue when the expected counts are not large enough. We need to look deeper and view the $p$ value provided from the function. We can see that the $p$ value (provided by `fisher.test()`) is $0.2616$ on a two tail test. From this $p$ value we refuse to reject the null and consider the data to be independent.
+
+
+## Other Utilized Packages
+
+* `graphics`: The R Graphics Package
+
+  * Functions used: `abline`, `par`, `title`, `arrows`, `barplot`, `points`
+
+* `stats`: The R Stats Package
+
+  * Functions used: `fisher.test`, `chisq.test`, `addmargins`, `qnorm`
+  
+* `grDevices`: The R Graphics Devices and Support of Colurs and Fonts
+
+  * Functions used: `col2rgb`, `rgb`
 
 
 

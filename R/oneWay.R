@@ -51,6 +51,7 @@
 oneWay <- function(DataTab, alpha = 0.05){
   ################# Calculations #################
 
+  out <- chisq.test(DataTab, p = rep(1/length(DataTab),length(DataTab)))
   #This Functions creates a confidence interval based on Wald's Method
   #Two tailed confidence interval
   alph2 <- alpha/2
@@ -156,7 +157,7 @@ oneWay <- function(DataTab, alpha = 0.05){
   arrows(1:length(RDif), RLow, 1:length(RDif), RUp, length = 0.1, code = 3, angle = 90,
          col = "firebrick1", lwd = 2)
 
-  my_list <- list(prob = as.vector(p), Conf = CIs, Diff = RDif)
+  my_list <- list(prob = as.vector(p), Conf = CIs, Diff = RDif, pval = out$p.value)
 
   print(my_list)
 
