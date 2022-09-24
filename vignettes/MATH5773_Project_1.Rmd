@@ -1,0 +1,38 @@
+---
+title: "MATH5773_Project_1"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MATH5773_Project_1}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(Proj1MATH5773Skag0011)
+```
+
+# Notes
+When checking the package I kept getting the following note:
+<center>
+
+❯ checking for future file timestamps ... NOTE   unable to verify current time
+
+</center>
+
+I fixed this by adding `_R_CHECK_SYSTEM_CLOCK_=0` into my `.Renviron` file.
+
+
+
+
+
+
+
+
+
