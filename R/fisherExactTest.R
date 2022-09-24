@@ -17,7 +17,7 @@
 #'    \item \code{pval} p value indicating the reslult of hypothesis test.
 #'    \item \code{data} The passed in data with added margin sums.
 #'    }
-#'    A bar plot will also be generated that plots the row proportions of  the data
+#'    A bar plot will also be generated that plots the row proportions of the data
 #'    so we can better understand the data.
 #'
 #' @export
